@@ -278,7 +278,10 @@ void myKeyboardFunc( unsigned char key, int x, int y ){
 
         }
         converted = true;
+    }
 
+    if (key == 's'){
+        add_knot();
     }
 }
 
