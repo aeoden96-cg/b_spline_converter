@@ -1,0 +1,5 @@
+stupanj: 3
+vektor cvorova: [ 0,1,1,1,2,3,4 ]
+inic kontrolni poligon:
+	- v:[1,2,3]
+    - v:[1,2,3]
