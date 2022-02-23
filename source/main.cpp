@@ -283,17 +283,16 @@ void myKeyboardFunc( unsigned char key, int x, int y ){
 
 
     if (key == 'a'){
-        int num_of_25 = std::count(T.cbegin(),T.cend(),0.25f);
-        std::cout << "num0.25: " << num_of_25 << "\n";
-        add_knot(0.25f);
-        add_knot(0.25f);
+        for (int i = 0; i< T.size(); i ++){
+            int num_of = std::count(T.cbegin(),T.cend(),T[i]);
+            if (num_of < stupanj){
+                for ( int j = 0 ; j< stupanj - num_of + 1 ; j++){
+                    add_knot(T[i]);
+                }
+            }
 
-        add_knot(0.5f);
-        add_knot(0.5f);
 
-        add_knot(0.75f);
-        add_knot(0.75f);
-
+        }
         converted = true;
 
     }
@@ -493,21 +492,26 @@ void print_all(bool include_poly=false){
     std::vector<float> out;
 
     if(!converted){
-        for(float i = 0.01f;i < 1 ; i+=0.01f){
+        for(float i = 0.001f;i < 1 ; i+=0.01f){
             auto p = algo(i);
             out.push_back(p.x);
             out.push_back(p.y);
             out.push_back(p.z);
         }
 
-        shader.setVec3("col", colors[1]);
+        shader.setVec3("col", colors[0]);
         Renderer::render(shader, std::vector<int>({3}) , out, MVPs);
     }
     else{
-        for (int j = 3; j < 8; j++){
+        int color_ind = 0;
+        for (int j = 0; j < T.size()-1; j++){
+            if (T[j] == T[j+1]) continue;
+
             float limit_l = T[j];
+            if (limit_l <=0) limit_l = 0.001f;
             float limit_r = T[j+1];
             out.clear();
+
             for(float i = limit_l; i < limit_r; i+=0.01f){
                 auto p = algo(i);
                 out.push_back(p.x);
@@ -516,8 +520,9 @@ void print_all(bool include_poly=false){
             }
 
 
-            shader.setVec3("col", colors[j % colors.size()]);
+            shader.setVec3("col", colors[color_ind++ % (colors.size()-1) + 1]);
             Renderer::render(shader, std::vector<int>({3}) , out, MVPs);
+
         }
 
 
