@@ -35,8 +35,35 @@ const double Xmin = 0.0, Xmax = 3.0;
 const double Ymin = 0.0, Ymax = 3.0;
 
 glm::mat4 projection;
-
 Shader shader;
+
+bool converted = false;
+
+
+std::vector<glm::vec3> colors{
+        glm::vec3(0,0,1),
+        glm::vec3(0,1,0),
+        glm::vec3(1,0,0),
+        glm::vec3(0.5,0,1),
+        glm::vec3(0.8,0.8,0.1),
+        glm::vec3(1,0.5,0.1),
+
+};
+
+int stupanj= 3;
+std::vector<float> T{0,0,0,0,0.25,0.5,0.75,1,1,1,1};
+std::vector<glm::vec3> kp{
+        glm::vec3(-0.5f,-0.5f,0),
+        glm::vec3(-0.6f,-0.1f,0),
+        glm::vec3(0.0f,0.3f,0),
+        glm::vec3(0.4f,0.2f,0),
+        glm::vec3(0.5f,-0.2f,0),
+        glm::vec3(0.4f,-0.5f,0),
+        glm::vec3(0.2f,-0.7f,0)
+};
+float t =0.85f;
+
+
 
 enum spline_type {
     ONE,
@@ -52,50 +79,12 @@ bool track = false;
 std::vector<int> tracked_indexes;
 std::vector<int> fixed_indexes;
 
-
-
-int stupanj= 3;
-//std::vector<float> T{0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 4.0f, 5.0f, 5.0f, 5.0f, 5.0f};
-
-std::vector<float> T{0,0,0,0,0.25,0.5,0.75,1,1,1,1};
-
-float t = 0.85f;
+std::vector<std::vector<glm::vec3>> P{};
 
 void print_vec(glm::vec3 v){
     std::cout << "("<< v.x << ", " << v.y << ", " << v.z << " )\n";
 }
 
-std::vector<glm::vec3> kp{
-        glm::vec3(-0.5f,-0.5f,0),
-        glm::vec3(-0.6f,-0.1f,0),
-        glm::vec3(0.0f,0.3f,0),
-        glm::vec3(0.4f,0.2f,0),
-        glm::vec3(0.5f,-0.2f,0),
-        glm::vec3(0.4f,-0.5f,0),
-        glm::vec3(0.2f,-0.7f,0)
-};
-
-std::vector<std::vector<glm::vec3>> P{};
-
-
-
-std::vector<float> final;
-
-glm::mat4 addView(glm::mat4 model){
-    glm::mat4 view = glm::mat4();
-    return view * model;
-}
-
-
-
-
-/**
- * Trivial.Just apply view matrix.
- * @return
- */
-glm::mat4 createMVPBody(){
-    return addView(glm::mat4(1.0f));
-}
 
 bool approximatelyEqual(float a, float b, float epsilon)
 {
@@ -177,10 +166,10 @@ glm::vec3 algo(float t,bool info = false){
         }
 
 
-        for (int i = j-3+l ; i < j+1 ; i++ ){
+        for (int i = j-stupanj+l ; i < j+1 ; i++ ){
 
 
-            float a = (t - T[i])    /(T[i+3+1-l] - T[i]);
+            float a = (t - T[i])    /(T[i+stupanj+1-l] - T[i]);
 
             //glm::vec3 P_i_l =  (1-a) * P[l-1][i]  + a * P[l-1][i-1];
             P[l][i]=a * P[l-1][i]  + (1-a) * P[l-1][i-1];
@@ -208,7 +197,7 @@ glm::vec3 algo(float t,bool info = false){
 
 
     //std::cout << P[3].size() << "\n";
-    return P[3][j];
+    return P[stupanj][j];
 }
 
 void add_knot(float knot = -8){
@@ -250,7 +239,7 @@ void add_knot(float knot = -8){
             q = kp[j-1];
         }
         else{
-            q = (new_knot-T[j])/(T[j+3+1] - T[j])* kp[j] + (T[j+3+1]-new_knot)/(T[j+3+1] - T[j]) * kp[j-1];
+            q = (new_knot-T[j])/(T[j+stupanj+1] - T[j])* kp[j] + (T[j+stupanj+1]-new_knot)/(T[j+stupanj+1] - T[j]) * kp[j-1];
         }
 
 
@@ -305,6 +294,8 @@ void myKeyboardFunc( unsigned char key, int x, int y ){
         add_knot(0.75f);
         add_knot(0.75f);
 
+        converted = true;
+
     }
 }
 
@@ -320,7 +311,7 @@ void mySpecialKeyFunc( int key, int x, int y )
     if (t <= 0) t = 0.001f;
     if (t >1) t = 1;
 
-    std::cout << "new t:" << t << "\n";
+    //std::cout << "new t:" << t << "\n";
 }
 
 
@@ -355,9 +346,53 @@ int main(int argc, char ** argv)
     YAML::Node config = YAML::LoadFile("config.yaml");
 
     std::cout << "Ucitavam:\n";
+
     if (config["stupanj"]) {
         std::cout << "Stupanj: " << config["stupanj"].as<int>() << "\n";
         stupanj =  config["stupanj"].as<int>();
+    }
+
+    if (config["startna tocka"]) {
+        std::cout << "Startna tocka: " << config["startna tocka"].as<float>() << "\n";
+        t =  config["startna tocka"].as<float>();
+    }
+
+
+    if (config["vektor cvorova"]) {
+        T.clear();
+        std::cout << "Vektor cvorova: [";
+        YAML::Node vekt_c = config["vektor cvorova"];
+        for (YAML::iterator it = vekt_c.begin(); it != vekt_c.end(); ++it) {
+            const YAML::Node& sensor = *it;
+            std::cout << sensor.as<float>() << ", ";
+
+            T.push_back(sensor.as<float>());
+        }
+        std::cout << "]\n";
+
+    }
+
+    if (config["kontrolni poligon"]) {
+        kp.clear();
+        std::cout << "Kontrolni poligon: [\n";
+        YAML::Node vekt = config["kontrolni poligon"];
+        for (YAML::iterator it = vekt.begin(); it != vekt.end(); ++it) {
+            const YAML::Node& sensor = *it;
+            glm::vec3 temp;
+            temp.z=0;
+
+            std::cout << "   " <<sensor.as<float>() << ", ";
+            temp.x=sensor.as<float>();
+            ++it;
+            const YAML::Node& sensor2 = *it;
+            std::cout <<sensor2.as<float>() <<"\n";
+            temp.y=sensor2.as<float>();
+
+            kp.push_back(temp);
+
+        }
+        std::cout << "]\n";
+
     }
 
 
@@ -412,48 +447,13 @@ bool init_data()
     //    glHint(GL_POLYGON_SMOOTH, GL_DONT_CARE);
     //    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    auto p = algo(t,true);
 
-    print_vec(p);
-
-//    std::cout << "TEST\n";
-//    std::cout << P.size() << "\n";
-//
-//    for (auto v: P){
-//        std::cout << "s:" << v.size()<< "\n";
-//        for (auto pp:v){
-//            print_vec(pp);
-//        }
+//    for ( auto p : kp){
+//        print_vec(p);
 //    }
-
-
-
-
-
-//    std::cout << P[0][3].x << " " << P[0][3].y << " " << P[0][3].z << "\n";
-//
-//    std::cout << P[3][0].x << " " << P[3][0].y << " " << P[3][0].z << "\n";
-
-
-
-//    std::cout << P[1].size() << "\n";
-//    for(auto p : P[1]){
-//        std::cout << p.x << " " << p.y << " " << p.z << "\n";
-//
-//    }
-
-
-
-
-
-
 
 	std::cout << "Going to load programs... " << std::endl << std::flush;
-
-
     shader.load_shaders({"BackgroundVertexShader.vert","BackgroundFragmentShader.frag","","",""});
-
-
 	return true;
 }
 
@@ -464,7 +464,7 @@ void print_one(){
     std::vector<float> out;
     auto p = algo(t);
 
-    for (int i = 0 ; i <= 3 ; i++){
+    for (int i = 0 ; i <= stupanj ; i++){
         out.clear();
 
         for (auto p: P[i]){
@@ -472,7 +472,7 @@ void print_one(){
             out.push_back(p.x);
             out.push_back(p.y);
             out.push_back(p.z);
-            if(i ==3){
+            if(i == stupanj){
                 out.push_back(0);
                 out.push_back(-0.6f);
                 out.push_back(0);
@@ -481,7 +481,7 @@ void print_one(){
         }
 
 
-        shader.setVec3("col", glm::vec3{(i+1)*0.2f,(i+1)*0.2f,0.5f});
+        shader.setVec3("col", colors[i]);
         Renderer::render(shader, std::vector<int>({3}) , out, MVPs);
     }
 
@@ -492,17 +492,37 @@ void print_all(bool include_poly=false){
     MVPs.emplace_back(1);
     std::vector<float> out;
 
+    if(!converted){
+        for(float i = 0.01f;i < 1 ; i+=0.01f){
+            auto p = algo(i);
+            out.push_back(p.x);
+            out.push_back(p.y);
+            out.push_back(p.z);
+        }
 
-    for(float i = 0.01f;i < 1 ; i+=0.01f){
-        auto p = algo(i);
-        out.push_back(p.x);
-        out.push_back(p.y);
-        out.push_back(p.z);
+        shader.setVec3("col", colors[1]);
+        Renderer::render(shader, std::vector<int>({3}) , out, MVPs);
+    }
+    else{
+        for (int j = 3; j < 8; j++){
+            float limit_l = T[j];
+            float limit_r = T[j+1];
+            out.clear();
+            for(float i = limit_l; i < limit_r; i+=0.01f){
+                auto p = algo(i);
+                out.push_back(p.x);
+                out.push_back(p.y);
+                out.push_back(p.z);
+            }
+
+
+            shader.setVec3("col", colors[j % colors.size()]);
+            Renderer::render(shader, std::vector<int>({3}) , out, MVPs);
+        }
+
+
     }
 
-
-    shader.setVec3("col", glm::vec3{(1)*0.2f,(1)*0.2f,0.5f});
-    Renderer::render(shader, std::vector<int>({3}) , out, MVPs);
 
     out.clear();
 
@@ -512,7 +532,7 @@ void print_all(bool include_poly=false){
             out.push_back(p.y);
             out.push_back(p.z);
         }
-        shader.setVec3("col", glm::vec3{0.4f,0.4f,0.5f});
+        shader.setVec3("col", colors[0]);
         Renderer::render(shader, std::vector<int>({3}) , out, MVPs);
 
     }
@@ -535,24 +555,6 @@ void myDisplay() {
 
     if(st == INCLUDE_POLY)
         print_all(true);
-
-
-
-
-    //std::cout << p.x << " " << p.y << " " << p.z << "\n";
-
-//    final.push_back(p.x);
-//    final.push_back(p.y);
-//    final.push_back(p.z);
-//
-//
-//    shader.setVec3("col", glm::vec3{(1+1)*0.2f,(1+1)*0.2f,0.5f});
-//    Renderer::render(shader, std::vector<int>({3}) , final, MVPs);
-
-
-
-
-//    MVPs.clear();
 
 
     glutSwapBuffers();
