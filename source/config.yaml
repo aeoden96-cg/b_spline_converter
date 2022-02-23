@@ -1,5 +1,17 @@
-stupanj: 2
+
+
+# PRIMJER S NETA https://pages.mtu.edu/~shene/COURSES/cs3621/NOTES/spline/de-Boor.html
+stupanj: 3
 vektor cvorova: [ 0.0,0.0,0.0,0.0,0.25,0.5,0.75,1.0,1.0,1.0,1.0]
 kontrolni poligon: [-0.5,-0.5, -0.6,-0.1, 0.0,0.3, 0.4,0.2, 0.5,-0.2, 0.4,-0.5, 0.2,-0.7]
 
 startna tocka: 0.85
+
+
+
+# PRIMJER PREDAVANJA
+#stupanj: 3
+#vektor cvorova: [ 0,0,0,0,1,4,5,5,5,5]
+#kontrolni poligon: [-0.5,-0.5, -0.6,-0.1, 0.0,0.3, 0.4,0.2, 0.5,-0.2, 0.4,-0.5, 0.2,-0.7]
+#
+#startna tocka: 4.1

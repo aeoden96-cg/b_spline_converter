@@ -105,8 +105,8 @@ void glutPassiveMotionFunc(int x, int y ) {
 
     for(int i = 0; i < kp.size();i++) {
         if (
-                approximatelyEqual(kp[i].x, xPos, 10E-2) &&
-                approximatelyEqual(kp[i].y, yPos, 10E-2)){
+                approximatelyEqual(kp[i].x, xPos, 0.2f) &&
+                approximatelyEqual(kp[i].y, yPos, 0.2f)){
 //            ind_track = i;
             tracked_indexes.push_back(i);
         }
@@ -122,7 +122,7 @@ void glutPassiveMotionFunc(int x, int y ) {
     }
 
 
-   //std::cout << ind_track << "\n";
+   //std::cout << tracked_indexes.size() << "\n";
 
 
     glutPostRedisplay();
@@ -144,9 +144,6 @@ glm::vec3 algo(float t,bool info = false){
 
         P.push_back(temp);
     }
-    //P.clear();
-
-
 
     int j=0;
     for (j = 0 ; t > T[j]; j++ );
@@ -155,25 +152,18 @@ glm::vec3 algo(float t,bool info = false){
     if (info)
         std::cout << "t=" << t << " j=" << j <<  " | " << T[j] << "<"  << t <<  "<" << T[j+1] <<"\n";
 
-    P[0]=kp;   // P[0] je skup orginalnih tocaka Pi^[0]
+    P[0]=kp;
 
     for (int l = 1 ; l <= stupanj ; l++){
-        //std::vector<glm::vec3> P_l{};
-
         if (info){
             std::cout << std::endl;
             std::cout << "L:" << l << "\n";
         }
 
-
         for (int i = j-stupanj+l ; i < j+1 ; i++ ){
 
-
             float a = (t - T[i])    /(T[i+stupanj+1-l] - T[i]);
-
-            //glm::vec3 P_i_l =  (1-a) * P[l-1][i]  + a * P[l-1][i-1];
             P[l][i]=a * P[l-1][i]  + (1-a) * P[l-1][i-1];
-            //P_l.push_back(P_i_l);
 
             if (info){
                 //std::cout << "\na:" << a << "\n";
@@ -186,12 +176,8 @@ glm::vec3 algo(float t,bool info = false){
 //                print_vec(P[l-1][i-1]);
             }
         }
-
-        //P.push_back(P_l);
         if(info)
             std::cout << std::endl;
-
-
     }
 
 
@@ -245,8 +231,6 @@ void add_knot(float knot = -8){
 
         new_kp.push_back(q);
     }
-
-
 
 
     kp = new_kp;
@@ -307,8 +291,8 @@ void mySpecialKeyFunc( int key, int x, int y )
         t += 0.01f;
     }
 
-    if (t <= 0) t = 0.001f;
-    if (t >1) t = 1;
+    if (t <= T[0]) t = 0.001f;
+    if (t > T[T.size()-1]) t = T[T.size()-1];
 
     //std::cout << "new t:" << t << "\n";
 }
@@ -447,10 +431,6 @@ bool init_data()
     //    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 
-//    for ( auto p : kp){
-//        print_vec(p);
-//    }
-
 	std::cout << "Going to load programs... " << std::endl << std::flush;
     shader.load_shaders({"BackgroundVertexShader.vert","BackgroundFragmentShader.frag","","",""});
 	return true;
@@ -499,7 +479,7 @@ void print_all(bool include_poly=false){
             out.push_back(p.z);
         }
 
-        shader.setVec3("col", colors[0]);
+        shader.setVec3("col", colors[1]);
         Renderer::render(shader, std::vector<int>({3}) , out, MVPs);
     }
     else{

@@ -14,8 +14,6 @@ target_include_directories (SHADER PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 ADD_EXECUTABLE(PROJECT
         source/main.cpp
         source/main.hpp
-        source/Background.cpp
-        source/Background.hpp
         source/Renderer.cpp
         source/Renderer.hpp)
 
@@ -32,7 +30,14 @@ target_link_libraries(
 #            ${GLEW_LIBRARIES}
         -lGLEW -lGL -lGLU -lglut -lpthread -lm -lyaml-cpp)
 
-file(GLOB MY_SHADERS "source/*.tesc" "source/*.tese" "source/*.vert" "source/*.frag" "source/*.geom" "source/*.yaml")
+file(GLOB MY_SHADERS
+        "source/*.tesc"
+        "source/*.tese"
+        "source/*.vert"
+        "source/*.frag"
+        "source/*.geom"
+        "source/*.yaml")
+
 foreach(shader ${MY_SHADERS})
     configure_file(${shader} ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
 endforeach()
