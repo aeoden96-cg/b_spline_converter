@@ -7,11 +7,12 @@
 #include <GL/freeglut.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <algorithm>
 
 #include "util/Shader.h"
 #include "main.hpp"
 #include "Renderer.hpp"
-
+#include "yaml-cpp/yaml.h"
 #ifdef _WIN32
     #include <windows.h>
 #endif
@@ -37,21 +38,46 @@ glm::mat4 projection;
 
 Shader shader;
 
+enum spline_type {
+    ONE,
+    ALL,
+    INCLUDE_POLY
+};
+
+spline_type st = ONE;
+
+//int ind_track;
+//int fixed_track;
 bool track = false;
+std::vector<int> tracked_indexes;
+std::vector<int> fixed_indexes;
+
+
 
 int stupanj= 3;
-std::vector<float> T{0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 4.0f, 5.0f, 5.0f, 5.0f, 5.0f};
+//std::vector<float> T{0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 4.0f, 5.0f, 5.0f, 5.0f, 5.0f};
 
-//float t = 2;
+std::vector<float> T{0,0,0,0,0.25,0.5,0.75,1,1,1,1};
+
+float t = 0.85f;
+
+void print_vec(glm::vec3 v){
+    std::cout << "("<< v.x << ", " << v.y << ", " << v.z << " )\n";
+}
 
 std::vector<glm::vec3> kp{
         glm::vec3(-0.5f,-0.5f,0),
-        glm::vec3(-0.3f,0.1f,0),
-        glm::vec3(0.0f,0.1f,0),
-        glm::vec3(0.5f,-0.5f,0),glm::vec3(0.7f,-0.5f,0)
+        glm::vec3(-0.6f,-0.1f,0),
+        glm::vec3(0.0f,0.3f,0),
+        glm::vec3(0.4f,0.2f,0),
+        glm::vec3(0.5f,-0.2f,0),
+        glm::vec3(0.4f,-0.5f,0),
+        glm::vec3(0.2f,-0.7f,0)
 };
 
-std::vector<std::vector<glm::vec3>> P;
+std::vector<std::vector<glm::vec3>> P{};
+
+
 
 std::vector<float> final;
 
@@ -75,8 +101,7 @@ bool approximatelyEqual(float a, float b, float epsilon)
 {
     return fabs(a - b) <= ( (fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * epsilon);
 }
-int ind_track;
-int fixed_track;
+
 
 void glutPassiveMotionFunc(int x, int y ) {
 
@@ -86,24 +111,29 @@ void glutPassiveMotionFunc(int x, int y ) {
     yPos=-2*yPos+1;
 
 
+    //ind_track = -1;
+    tracked_indexes.clear();
 
-    ind_track = -1;
     for(int i = 0; i < kp.size();i++) {
         if (
                 approximatelyEqual(kp[i].x, xPos, 10E-2) &&
                 approximatelyEqual(kp[i].y, yPos, 10E-2)){
-            ind_track = i;
+//            ind_track = i;
+            tracked_indexes.push_back(i);
         }
     }
 
     if (track){
-        kp[fixed_track].x = xPos;
-        kp[fixed_track].y = yPos;
-
+        for (auto ind : fixed_indexes){
+//            kp[fixed_track].x = xPos;
+//            kp[fixed_track].y = yPos;
+            kp[ind].x = xPos;
+            kp[ind].y = yPos;
+        }
     }
 
 
-   // std::cout << ind_track << "\n";
+   //std::cout << ind_track << "\n";
 
 
     glutPostRedisplay();
@@ -111,23 +141,225 @@ void glutPassiveMotionFunc(int x, int y ) {
 }
 
 
+glm::vec3 algo(float t,bool info = false){
+    for (auto p: P) p.clear();
+    P.clear();
 
+
+    for (int ii = 0; ii< 20 ; ii++) {
+        std::vector<glm::vec3> temp;
+        for (int jj = 0; jj < 20; jj++) {
+            glm::vec3 tt{-5,-5,0};
+            temp.push_back(tt);
+        }
+
+        P.push_back(temp);
+    }
+    //P.clear();
+
+
+
+    int j=0;
+    for (j = 0 ; t > T[j]; j++ );
+    j--;
+
+    if (info)
+        std::cout << "t=" << t << " j=" << j <<  " | " << T[j] << "<"  << t <<  "<" << T[j+1] <<"\n";
+
+    P[0]=kp;   // P[0] je skup orginalnih tocaka Pi^[0]
+
+    for (int l = 1 ; l <= stupanj ; l++){
+        //std::vector<glm::vec3> P_l{};
+
+        if (info){
+            std::cout << std::endl;
+            std::cout << "L:" << l << "\n";
+        }
+
+
+        for (int i = j-3+l ; i < j+1 ; i++ ){
+
+
+            float a = (t - T[i])    /(T[i+3+1-l] - T[i]);
+
+            //glm::vec3 P_i_l =  (1-a) * P[l-1][i]  + a * P[l-1][i-1];
+            P[l][i]=a * P[l-1][i]  + (1-a) * P[l-1][i-1];
+            //P_l.push_back(P_i_l);
+
+            if (info){
+                //std::cout << "\na:" << a << "\n";
+                std::cout << "P" << i << "_[" << l << "]: ";
+                print_vec(P[l][i]);
+//                std::cout << "i need:\n" ;
+//                std::cout << "P" << i << "_[" << l-1 << "] = ";
+//                print_vec(P[l-1][i]);
+//                std::cout << "P" << i-1 << "_[" << l-1 << "] =";
+//                print_vec(P[l-1][i-1]);
+            }
+        }
+
+        //P.push_back(P_l);
+        if(info)
+            std::cout << std::endl;
+
+
+    }
+
+
+
+    //std::cout << P[3].size() << "\n";
+    return P[3][j];
+}
+
+void add_knot(float knot = -8){
+    float new_knot;
+    if (knot > -7){
+        new_knot = knot;
+    }
+
+    else{
+        std::cout << "NEW KNOT: ";
+        std::cin >> new_knot;
+        std::cout << "\n";
+    }
+
+
+    int l;
+    for (int j = 0 ; j < T.size()-1;j++){
+        if (T[j]  <= new_knot &&    new_knot < T[j+1]){
+            l = j;
+            break;
+        }
+    }
+
+
+    //std::cout << "l: " << l << "\n";
+
+    T.insert(T.begin() + l+1,new_knot);
+
+
+    std::vector<glm::vec3> new_kp{};
+
+    for (int j = 0; j < kp.size() + 1 ;j++){
+        glm::vec3 q;
+
+        if (j <= l - stupanj ){
+            q = kp[j];
+        }
+        else if(l+1 <=j){
+            q = kp[j-1];
+        }
+        else{
+            q = (new_knot-T[j])/(T[j+3+1] - T[j])* kp[j] + (T[j+3+1]-new_knot)/(T[j+3+1] - T[j]) * kp[j-1];
+        }
+
+
+        new_kp.push_back(q);
+    }
+
+
+
+
+    kp = new_kp;
+
+    std::cout << "NEW T:[";
+
+    for (auto tt: T){
+        std::cout << tt << ", ";
+    }
+    std::cout << "]\n";
+
+
+
+}
 
 void myKeyboardFunc( unsigned char key, int x, int y ){
 
+    if (key == 'b'){
+        st = ONE;
+
+    }
+    if (key == 'n'){
+        st = ALL;
+
+    }
     if (key == 'm'){
-        track = !track;
-        fixed_track=ind_track;
+        st = INCLUDE_POLY;
+
+    }
+
+    if (key == 'i'){
+        algo(t,true);
+    }
+
+
+    if (key == 'a'){
+        int num_of_25 = std::count(T.cbegin(),T.cend(),0.25f);
+        std::cout << "num0.25: " << num_of_25 << "\n";
+        add_knot(0.25f);
+        add_knot(0.25f);
+
+        add_knot(0.5f);
+        add_knot(0.5f);
+
+        add_knot(0.75f);
+        add_knot(0.75f);
+
     }
 }
 
 void mySpecialKeyFunc( int key, int x, int y )
 {
+    if(key == GLUT_KEY_LEFT){
+        t -= 0.01f;
+    }
+    else if(key == GLUT_KEY_RIGHT){
+        t += 0.01f;
+    }
 
+    if (t <= 0) t = 0.001f;
+    if (t >1) t = 1;
+
+    std::cout << "new t:" << t << "\n";
 }
 
+
+void mouse(int button, int state, int x, int y)
+{
+
+
+    //std::cout << button  << " " << state << "\n";
+    if (button == GLUT_LEFT_BUTTON)
+    {
+
+        if (state == GLUT_DOWN){
+            track = true;
+            fixed_indexes = tracked_indexes;
+//            fixed_track=ind_track;
+        }
+        else{
+            track = false;
+            fixed_indexes.clear();
+//            fixed_track=-1;
+        }
+
+    }
+
+
+
+
+}
 int main(int argc, char ** argv)
 {
+
+    YAML::Node config = YAML::LoadFile("config.yaml");
+
+    std::cout << "Ucitavam:\n";
+    if (config["stupanj"]) {
+        std::cout << "Stupanj: " << config["stupanj"].as<int>() << "\n";
+        stupanj =  config["stupanj"].as<int>();
+    }
+
 
 	// Sljedeci blok sluzi kao bugfix koji je opisan gore
 	#ifdef LINUX_UBUNTU_SEGFAULT
@@ -146,7 +378,8 @@ int main(int argc, char ** argv)
 	glutReshapeFunc(resizeWindow);
 	glutDisplayFunc(myDisplay);
 	glutKeyboardFunc( myKeyboardFunc );			// Handles "normal" ascii symbols
-    //glutMouseFunc(myMouseFunc);
+    glutMouseFunc(mouse);
+    glutMotionFunc(glutPassiveMotionFunc);
     glutPassiveMotionFunc(glutPassiveMotionFunc);
 	glutSpecialFunc( mySpecialKeyFunc );		// Handles "special" keyboard keys
 
@@ -167,38 +400,7 @@ int main(int argc, char ** argv)
 
 
 
-glm::vec3 algo(float t){
-    for (auto p: P) p.clear();
-    P.clear();
-    int j=0;
-    for (j = 0 ; t > T[j]; j++ );
-    j--;
 
-    //std::cout << "t=" << t << " j=" << j <<  " | " << T[j] << "<"  << t <<  "<" << T[j+1] <<"\n";
-
-    P.push_back(kp);   // P[0] je skup orginalnih tocaka Pi^[0]
-
-    for (int l = 1 ; l <= stupanj ; l++){
-        std::vector<glm::vec3> P_l;
-
-        for (int i = l ; i < j ;i++ ){
-            glm::vec3 P_i_l =
-                    (t - T[i+1])    /(T[i+1+j-l] - T[i+1]) * P[l-1][i]  +
-                    (T[i+1+j-l] - t)/(T[i+1+j-l] - T[i+1]) * P[l-1][i-1];
-
-            P_l.push_back(P_i_l);
-        }
-
-        P.push_back(P_l);
-
-
-    }
-
-
-
-    //std::cout << P[3].size() << "\n";
-    return P[3][j];
-}
 
 bool init_data()
 {
@@ -209,6 +411,20 @@ bool init_data()
     //	  glEnable(GL_BLEND);
     //    glHint(GL_POLYGON_SMOOTH, GL_DONT_CARE);
     //    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    auto p = algo(t,true);
+
+    print_vec(p);
+
+//    std::cout << "TEST\n";
+//    std::cout << P.size() << "\n";
+//
+//    for (auto v: P){
+//        std::cout << "s:" << v.size()<< "\n";
+//        for (auto pp:v){
+//            print_vec(pp);
+//        }
+//    }
 
 
 
@@ -242,9 +458,68 @@ bool init_data()
 }
 
 
+void print_one(){
+    std::vector<glm::mat4> MVPs;
+    MVPs.emplace_back(1);
+    std::vector<float> out;
+    auto p = algo(t);
+
+    for (int i = 0 ; i <= 3 ; i++){
+        out.clear();
+
+        for (auto p: P[i]){
+            if (p.x < -4) continue;
+            out.push_back(p.x);
+            out.push_back(p.y);
+            out.push_back(p.z);
+            if(i ==3){
+                out.push_back(0);
+                out.push_back(-0.6f);
+                out.push_back(0);
+            }
+
+        }
+
+
+        shader.setVec3("col", glm::vec3{(i+1)*0.2f,(i+1)*0.2f,0.5f});
+        Renderer::render(shader, std::vector<int>({3}) , out, MVPs);
+    }
+
+}
+
+void print_all(bool include_poly=false){
+    std::vector<glm::mat4> MVPs;
+    MVPs.emplace_back(1);
+    std::vector<float> out;
+
+
+    for(float i = 0.01f;i < 1 ; i+=0.01f){
+        auto p = algo(i);
+        out.push_back(p.x);
+        out.push_back(p.y);
+        out.push_back(p.z);
+    }
+
+
+    shader.setVec3("col", glm::vec3{(1)*0.2f,(1)*0.2f,0.5f});
+    Renderer::render(shader, std::vector<int>({3}) , out, MVPs);
+
+    out.clear();
+
+    if(include_poly){
+        for(auto p:kp){
+            out.push_back(p.x);
+            out.push_back(p.y);
+            out.push_back(p.z);
+        }
+        shader.setVec3("col", glm::vec3{0.4f,0.4f,0.5f});
+        Renderer::render(shader, std::vector<int>({3}) , out, MVPs);
+
+    }
 
 
 
+}
 
 
 void myDisplay() {
@@ -252,36 +527,27 @@ void myDisplay() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
+    if(st == ONE)
+        print_one();
 
-    std::vector<glm::mat4> MVPs;
-    MVPs.emplace_back(1);
-    std::vector<float> out;
+    if(st == ALL)
+        print_all();
 
-    auto p = algo(2);
+    if(st == INCLUDE_POLY)
+        print_all(true);
+
+
+
+
     //std::cout << p.x << " " << p.y << " " << p.z << "\n";
 
-    final.push_back(p.x);
-    final.push_back(p.y);
-    final.push_back(p.z);
-
-
-    shader.setVec3("col", glm::vec3{(1+1)*0.2f,(1+1)*0.2f,0.5f});
-    Renderer::render(shader, std::vector<int>({3}) , final, MVPs);
-
-
-
-    for (int i = 0 ; i < 3 ; i++){
-        out.clear();
-        for (auto p: P[i]){
-            out.push_back(p.x);
-            out.push_back(p.y);
-            out.push_back(p.z);
-        }
-        shader.setVec3("col", glm::vec3{(i+1)*0.3f,(i+1)*0.2f,0.5f});
-        Renderer::render(shader, std::vector<int>({3}) , out, MVPs);
-    }
-
-
+//    final.push_back(p.x);
+//    final.push_back(p.y);
+//    final.push_back(p.z);
+//
+//
+//    shader.setVec3("col", glm::vec3{(1+1)*0.2f,(1+1)*0.2f,0.5f});
+//    Renderer::render(shader, std::vector<int>({3}) , final, MVPs);
 
 
 
